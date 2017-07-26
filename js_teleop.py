@@ -1,12 +1,11 @@
-# Released by rdb under the Unlicense (unlicense.org)
-# Based on information from:
-# https://www.kernel.org/doc/Documentation/input/joystick-api.txt
+# Joystick controls for TORCS with datalogging.
+# Built based on js_linux from https://gist.github.com/rdb/8864666
 
-import os, struct, array, time
+import os, struct, array
 from threading import Thread
 from fcntl import ioctl
 from sys import exit
-from Client import Client, ServerState, DriverAction
+from Client import Client
 
 PI= 3.14159265359
 
@@ -14,7 +13,6 @@ class Input(object):
     def __init__(self):
         self.button_states = {}
         self.axis_states = {}
-        # [right trigger, left trigger, rx, ry, a, b, x, y]
 
 def js_read(input):
     # Iterate over the joystick devices.
@@ -23,10 +21,6 @@ def js_read(input):
     for fn in os.listdir('/dev/input'):
         if fn.startswith('js'):
             print('  /dev/input/%s' % (fn))
-
-    # # We'll store the states here.
-    # axis_states = {}
-    # button_states = {}
 
     # These constants were borrowed from linux/input.h
     axis_names = {
@@ -207,12 +201,12 @@ def drive(c, inputs):
         R['gear']=5
 
 
-    if button_states['thumbl']: # reverse
+    if button_states['thumbl']: # left thumb button force reverse
         R['gear'] = -1
 
-    if button_states['tr']:
+    if button_states['tr']:     # right trigger force upshift
         R['gear'] = S['gear'] + 1
-    elif button_states['tl']:
+    elif button_states['tl']:   # left trigger force downshift
         R['gear'] = S['gear'] - 1
 
     return
@@ -220,6 +214,8 @@ def drive(c, inputs):
 # ================ MAIN ================
 if __name__ == "__main__":
     C= Client(p=3001)
+
+    # We put joystick processing in a thread to avoid blocking read
     inputs = Input()
     t = Thread(target = js_read, args=[inputs])
     t.daemon = True
