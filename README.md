@@ -1,5 +1,5 @@
 # torcs_scripts
-Python scripts for controlling cars in TORCS.
+Python scripts for controlling cars in TORCS. Works with Python 3
 
 TORCS SCRC Patch installation instructions:
 * Download torcs-1.3.4: https://sourceforge.net/projects/torcs/files/all-in-one/1.3.4/
@@ -18,4 +18,3 @@ TORCS SCRC Patch installation instructions:
 
 Try to configure a race, if you get segfault when you hit accept:
 Delete ~/.torcs and /usr/local/lib/torcs and /usr/local/share/games/torcs. Then I recompiled and reinstalled. That worked.
-
