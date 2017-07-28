@@ -1,7 +1,8 @@
 # Joystick controls for TORCS with datalogging.
 # Built based on js_linux from https://gist.github.com/rdb/8864666
 
-import os, struct, array
+import os, struct, array, datetime
+import numpy as np
 from threading import Thread
 from fcntl import ioctl
 from sys import exit
@@ -14,7 +15,7 @@ class Input(object):
         self.button_states = {}
         self.axis_states = {}
 
-def js_read(input):
+def jsRead(input):
     # Iterate over the joystick devices.
     print('Available devices:')
 
@@ -166,8 +167,8 @@ def drive(c, inputs):
 
     R['steer']= -axis_states['rx'] * .75  # js gives -1 for full left
 
-    R['accel'] = (axis_states['rz'] + 1)/2.
-    R['brake'] = (axis_states['z'] + 1)/2.
+    R['accel'] = (axis_states['rz'] + 1)/2.*.5
+    R['brake'] = ((axis_states['z'] + 1)/2.)**2*.5
 
     # # Traction Control System
     # if ((S['wheelSpinVel'][2]+S['wheelSpinVel'][3]) -
@@ -211,19 +212,65 @@ def drive(c, inputs):
 
     return
 
+def statesAsArray(S):
+    res = []
+    keys = ['angle', 'curLapTime', 'damage', 'distFromStart', 'distRaced', 'focus', \
+            'fuel', 'gear', 'lastLapTime', 'opponents', 'racePos', 'rpm', \
+            'speedX', 'speedY', 'speedZ', 'track', 'trackPos', 'wheelSpinVel', 'z']
+
+    for key in keys:
+        try:
+            res.extend(S[key])
+        except TypeError:
+            res.extend([S[key]])
+
+    return res
+
+def inputsAsArray(R):
+    res = []
+    keys = ['accel', 'brake', 'gear', 'steer', 'clutch', 'focus', 'meta']
+
+    for key in keys:
+        try:
+            res.extend(R[key])
+        except TypeError:
+            res.extend([R[key]])
+
+    return res
+
 # ================ MAIN ================
 if __name__ == "__main__":
     C= Client(p=3001)
 
     # We put joystick processing in a thread to avoid blocking read
     inputs = Input()
-    t = Thread(target = js_read, args=[inputs])
+    t = Thread(target = jsRead, args=[inputs])
     t.daemon = True
     t.start()
+
+    logged_states = np.zeros((C.maxSteps, 79))
+    logged_inputs = np.zeros((C.maxSteps, 11))
+    
   
-    for step in range(C.maxSteps,0,-1):
-        C.get_servers_input()
+    for step in range(C.maxSteps):
+        response = C.get_servers_input() # this will be -1 if shutdown
+        if (response == -1):
+            print('CAUGHT THE SHUTDOWN AT STEP %d' % step)
+            break
         drive(C, inputs)
+        logged_states[step, :] = statesAsArray(C.S.d)
+        logged_inputs[step, :] = inputsAsArray(C.R.d)
         C.respond_to_server()
 
     C.shutdown()
+
+    # Slice unused parts of matrix
+    logged_states = logged_states[:step, :]
+    logged_inputs = logged_inputs[:step, :]
+
+    now = datetime.datetime.now().strftime("%H_%M_%S_%m-%d-%Y")
+
+    np.save("logs/logged_states_%s" % now, logged_states)
+    np.save("logs/logged_inputs_%s" % now, logged_inputs)
+
+    

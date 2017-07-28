@@ -235,7 +235,7 @@ class Client():
                         "You were in %d place.") %
                         (self.port,self.S.d['racePos'])))
                 self.shutdown()
-                return
+                return -1
             elif '***restart***' in sockdata:
                 # What do I do here?
                 print("Server has restarted the race on %d." % self.port)
