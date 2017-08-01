@@ -167,7 +167,7 @@ def drive(c, inputs):
 
     R['steer']= -axis_states['rx'] * .75  # js gives -1 for full left
 
-    R['accel'] = (axis_states['rz'] + 1)/2.*.5
+    R['accel'] = (axis_states['rz'] + 1)/2.
     R['brake'] = ((axis_states['z'] + 1)/2.)**2*.5
 
     # # Traction Control System
@@ -177,6 +177,9 @@ def drive(c, inputs):
 
     # Automatic Transmission
     R['gear']=S['gear']
+
+    if (S['gear'] == 0):    # shift out of neutral
+        R['gear'] = 1
 
     if (S['speedX']>70 and S['gear'] <= 1):
         R['gear']=2
