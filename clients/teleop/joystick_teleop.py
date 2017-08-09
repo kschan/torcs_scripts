@@ -253,8 +253,8 @@ if __name__ == "__main__":
 
     logged_states = np.zeros((C.maxSteps, 79))
     logged_inputs = np.zeros((C.maxSteps, 11))
-    
-  
+
+
     for step in range(C.maxSteps):
         response = C.get_servers_input() # this will be -1 if shutdown
         if (response == -1):
@@ -276,4 +276,4 @@ if __name__ == "__main__":
     np.save("logs/logged_states_%s" % now, logged_states)
     np.save("logs/logged_inputs_%s" % now, logged_inputs)
 
-    
+
