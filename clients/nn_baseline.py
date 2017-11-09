@@ -60,71 +60,70 @@ import os
 import time
 PI= 3.14159265359
 
+import numpy as np
+import tensorflow as tf
+
 from Client import Client, ServerState, DriverAction, destringify
 
-def drive(c):
+
+num_inputs = 1
+states_idxs = [0] + list(range(54, 74)) 
+num_states = len(states_idxs)
+x = tf.placeholder(tf.float32, [None, num_states], name="x")
+y = tf.placeholder(tf.float32, [None, num_inputs], name="y")
+
+x_norm = tf.nn.l2_normalize(x, dim = 1, epsilon=1e-12, name = 'x_norm')
+# y_norm = tf.nn.l2_normalize(y, dim = 1, epsilon=1e-12, name = 'y_norm')
+
+fc1 = tf.nn.relu(tf.layers.dense(x_norm, 256))
+# fc1 = tf.nn.batch_normalization(fc1)
+
+fc2 = tf.nn.relu(tf.layers.dense(fc1, 256))
+# fc2 = tf.nn.batch_normalization(fc2)
+
+predictions = tf.layers.dense(fc2, num_inputs, name="predictions")
+
+
+def statesAsArray(S):
+    res = []
+    keys = ['angle', 'curLapTime', 'damage', 'distFromStart', 'distRaced', 'focus', \
+            'fuel', 'gear', 'lastLapTime', 'opponents', 'racePos', 'rpm', \
+            'speedX', 'speedY', 'speedZ', 'track', 'trackPos', 'wheelSpinVel', 'z']
+
+    for key in keys:
+        try:
+            res.extend(S[key])
+        except TypeError:
+            res.extend([S[key]])
+
+    return res
+
+
+def drive(c, sess):
 
     S,R= c.S.d,c.R.d
-    target_speed=100
 
-    # keys = ['accel', 'brake', 'gear', 'steer', 'clutch', 'focus', 'meta']
-    # for key in keys:
-    #     r = R[key]
-    #     if isinstance(r, list):
-    #         print(key, len(R[key]))
-    #     else:
-    #         print(key, 1)
+    states = np.asarray(statesAsArray(S)).reshape([1, -1])
+    states = states[:, states_idxs]
+    
+    inputs = sess.run(predictions, feed_dict={x: states}).flatten()
+
+    print(inputs)
 
 
-    # Steer To Corner
-    R['steer']= S['angle']*10 / PI
-    # Steer To Center
-    R['steer']-= S['trackPos']*.10
-
-    # Throttle Control
-    if S['speedX'] < target_speed - (R['steer']*50):
-        R['accel']+= .01
-    else:
-        R['accel']-= .01
-    if S['speedX']<10:
-       R['accel']+= 1/(S['speedX']+.1)
-
-    # Automatic Transmission
-    R['gear']=S['gear']
-
-    if (S['gear'] == 0):    # shift out of neutral
-        R['gear'] = 1
-
-    if (S['speedX']>70 and S['gear'] <= 1):
-        R['gear']=2
-    if (S['speedX']>120 and S['gear'] <= 2):
-        R['gear']=3
-    if (S['speedX']>160 and S['gear'] <= 3):
-        R['gear']=4
-    if (S['speedX']>200 and S['gear'] <= 4):
-        R['gear']=5
-    if (S['speedX']>240 and S['gear'] <= 5):
-        R['gear']=6
-
-
-    if (S['speedX']<65 and S['gear'] >= 2):
-        R['gear']=1
-    if (S['speedX']<115 and S['gear'] >= 3):
-        R['gear']=2
-    if (S['speedX']<155 and S['gear'] >= 4):
-        R['gear']=3
-    if (S['speedX']<195 and S['gear'] >= 5):
-        R['gear']=4
-    if (S['speedX']<235 and S['gear'] >= 6):
-        R['gear']=5
+    R['steer'] = inputs[0]
 
     return
 
 # ================ MAIN ================
 if __name__ == "__main__":
-    C= Client(p=3001)
-    for step in range(C.maxSteps,0,-1):
-        C.get_servers_input()
-        drive(C)
-        C.respond_to_server()
-    C.shutdown()
+
+    with tf.Session() as sess:
+        saver = tf.train.Saver()
+        saver.restore(sess, "./models/fc_baseline.ckpt")
+        C= Client(p=3001)
+        for step in range(C.maxSteps,0,-1):
+            C.get_servers_input()
+            drive(C, sess)
+            C.respond_to_server()
+        C.shutdown()
