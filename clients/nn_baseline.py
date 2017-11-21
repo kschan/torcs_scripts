@@ -64,25 +64,9 @@ import numpy as np
 import tensorflow as tf
 
 from Client import Client, ServerState, DriverAction, destringify
+from model import Model
 
-
-num_inputs = 1
-states_idxs = [0] + list(range(54, 74)) 
-num_states = len(states_idxs)
-x = tf.placeholder(tf.float32, [None, num_states], name="x")
-y = tf.placeholder(tf.float32, [None, num_inputs], name="y")
-
-x_norm = tf.nn.l2_normalize(x, dim = 1, epsilon=1e-12, name = 'x_norm')
-# y_norm = tf.nn.l2_normalize(y, dim = 1, epsilon=1e-12, name = 'y_norm')
-
-fc1 = tf.nn.relu(tf.layers.dense(x_norm, 256))
-# fc1 = tf.nn.batch_normalization(fc1)
-
-fc2 = tf.nn.relu(tf.layers.dense(fc1, 256))
-# fc2 = tf.nn.batch_normalization(fc2)
-
-predictions = tf.layers.dense(fc2, num_inputs, name="predictions")
-
+model = Model('fc_steer')
 
 def statesAsArray(S):
     res = []
@@ -104,12 +88,11 @@ def drive(c, sess):
     S,R= c.S.d,c.R.d
 
     states = np.asarray(statesAsArray(S)).reshape([1, -1])
-    states = states[:, states_idxs]
+    states = states[:, model.states_idxs]
     
-    inputs = sess.run(predictions, feed_dict={x: states}).flatten()
+    inputs = sess.run(model.predictions, feed_dict={model.x: states}).flatten()
 
     print(inputs)
-
 
     R['steer'] = inputs[0]
 
