@@ -62,11 +62,15 @@ PI= 3.14159265359
 
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from Client import Client, ServerState, DriverAction, destringify
 from model import Model
 
 model = Model('fc_steer')
+CURSOR_UP_ONE = '\x1b[1A'
+ERASE_LINE = '\x1b[2K'
+
 
 def statesAsArray(S):
     res = []
@@ -75,6 +79,7 @@ def statesAsArray(S):
             'speedX', 'speedY', 'speedZ', 'track', 'trackPos', 'wheelSpinVel', 'z']
 
     for key in keys:
+        # print(key, len(res))
         try:
             res.extend(S[key])
         except TypeError:
@@ -84,15 +89,20 @@ def statesAsArray(S):
 
 
 def drive(c, sess):
-
     S,R= c.S.d,c.R.d
+    # statesAsArray(S)
 
     states = np.asarray(statesAsArray(S)).reshape([1, -1])
     states = states[:, model.states_idxs]
     
     inputs = sess.run(model.predictions, feed_dict={model.x: states}).flatten()
 
-    print(inputs)
+    # print(inputs)
+
+    if step%100 == 0:
+        print(CURSOR_UP_ONE + ERASE_LINE + CURSOR_UP_ONE)
+        print('distRaced:, ', S['distRaced'], 'trackPos: ', S['trackPos'], '\r',)
+        track_pos.append(S['trackPos'])
 
     R['steer'] = inputs[0]
 
@@ -100,7 +110,7 @@ def drive(c, sess):
 
 # ================ MAIN ================
 if __name__ == "__main__":
-
+    track_pos = []
     with tf.Session() as sess:
         saver = tf.train.Saver()
         saver.restore(sess, "./models/fc_baseline.ckpt")
@@ -110,3 +120,7 @@ if __name__ == "__main__":
             drive(C, sess)
             C.respond_to_server()
         C.shutdown()
+
+    plt.plot(track_pos)
+    plt.show()
+

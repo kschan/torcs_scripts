@@ -70,18 +70,21 @@ def main(_):
     test_labels    = logged_inputs[test_indices, :]
     test_labels    = test_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
 
-    batch_size = 32
+    batch_size = 8
 
     losses, val_losses = [], []
 
+    # plt.hist(logged_states[:, 63], bins = 20)
+    # plt.show()
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for step in range(100000):
+        for step in range(50000):
             batch = get_next_batch(train_dataset, train_labels, batch_size)
             # print(batch[1])
-            _, loss = sess.run([model.train_step, model.mse_loss], feed_dict={model.x: batch[0], model.y: batch[1]})
+            _, loss = sess.run([model.train_step, model.total_loss], feed_dict={model.x: batch[0], model.y: batch[1]})
             if step % 50 == 0:
-                val_loss, = sess.run([model.mse_loss], feed_dict={model.x: valid_dataset, model.y: valid_labels})
+                val_loss, = sess.run([model.total_loss], feed_dict={model.x: valid_dataset, model.y: valid_labels})
                 print('step %d, training loss %f, val_loss %f' % (step, loss, val_loss))
                 losses.append(loss)
                 val_losses.append(val_loss)
