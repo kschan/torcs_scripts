@@ -43,13 +43,11 @@ class Model:
             raise RuntimeError("[ ERROR ] Wrong model_name entered")
 
     def build_fc_steer(self):
-        # Input data
-        self.input_idxs = [3]
-        self.num_inputs = len(self.input_idxs)
-
-        # Output data
         self.states_idxs = [73]
         self.num_states  = len(self.states_idxs)
+
+        self.input_idxs = [3]
+        self.num_inputs = len(self.input_idxs)
 
         # Create the model
         self.x = tf.placeholder(tf.float32, [None, self.num_states], name="x")
