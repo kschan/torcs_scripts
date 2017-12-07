@@ -34,26 +34,26 @@ def load_data(model):
     train_dataset  = logged_states[train_indices, :]
     train_dataset  = train_dataset[:, model.states_idxs]
     train_labels   = logged_inputs[train_indices, :]
-    train_labels   = train_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
+    train_labels   = train_labels[:, model.output_idxs].reshape((-1, model.num_outputs))
 
     valid_indices  = random_indices[(num_samples-20000):(num_samples-10000)]
     valid_dataset  = logged_states[valid_indices, :]
     valid_dataset  = valid_dataset[:, model.states_idxs]
     valid_labels   = logged_inputs[valid_indices, :]
-    valid_labels   = valid_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
+    valid_labels   = valid_labels[:, model.output_idxs].reshape((-1, model.num_outputs))
 
     test_indices   = random_indices[(num_samples-10000):]
     test_dataset   = logged_states[test_indices, :]
     test_dataset   = test_dataset[:, model.states_idxs]
     test_labels    = logged_inputs[test_indices, :]
-    test_labels    = test_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
+    test_labels    = test_labels[:, model.output_idxs].reshape((-1, model.num_outputs))
 
     return train_dataset, train_labels, \
            valid_dataset, valid_labels, \
            test_dataset , test_labels
 
 def train():
-    model = Model('fc_steer') # fc_steer or cnn_steer
+    model = Model('donkey_steer') # fc_steer or cnn_steer
 
     # Load dataset
     train_dataset, train_labels, \
