@@ -31,25 +31,27 @@ steer           3
 clutch          4
 '''
 
-
 class Model:
     def __init__(self, model_name): 
-       
         if model_name == 'fc_steer':
+            print('[ INFO ] Building fc_steer ...')
             self.build_fc_steer()
         elif model_name == 'cnn_steer':
+            print('[ INFO ] Building fc_steer ...')
             self.build_cnn_steer()
+        else:
+            raise RuntimeError("[ ERROR ] Wrong model_name entered")
 
     def build_fc_steer(self):
-
-        self.input_idxs = [3]       # only steering
-        self.states_idxs = [73]
-
+        # Input data
+        self.input_idxs = [3]
         self.num_inputs = len(self.input_idxs)
-        self.num_states = len(self.states_idxs)
+
+        # Output data
+        self.states_idxs = [73]
+        self.num_states  = len(self.states_idxs)
 
         # Create the model
-
         self.x = tf.placeholder(tf.float32, [None, self.num_states], name="x")
         self.y = tf.placeholder(tf.float32, [None, self.num_inputs], name="y")
 
@@ -64,6 +66,7 @@ class Model:
 
         self.predictions = tf.nn.tanh(tf.layers.dense(fc1, self.num_inputs, name="predictions"))
 
+        # Define loss and optimizer
         with tf.name_scope('loss'):
             self.total_loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.predictions)
 
@@ -92,7 +95,6 @@ class Model:
         conv3 = tf.layers.conv2d(conv2, filters = 40, kernel_size = [1, 3], strides= [1, 1])
         conv3 = tf.nn.relu(conv3)
 
-
         flattened = tf.contrib.layers.flatten(conv3)
         fc1_conv = tf.nn.tanh(tf.layers.dense(flattened, 15))
 
@@ -108,7 +110,6 @@ class Model:
 
         with tf.name_scope('loss'):
             self.total_loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.predictions)
-
 
         with tf.name_scope('adam_optimizer'):
             self.train_step = tf.train.AdamOptimizer(1e-5).minimize(self.total_loss)
