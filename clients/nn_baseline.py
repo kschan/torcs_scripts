@@ -53,24 +53,17 @@
 # Try `snakeoil.py --help` to get started.
 
 # for Python3-based torcs python robot client
-import socket
-import sys
-import getopt
-import os
-import time
+import socket, sys, getopt, os, time
 PI= 3.14159265359
-
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
-from Client import Client, ServerState, DriverAction, destringify
 from model import Model
+from Client import Client, ServerState, DriverAction, destringify
 
-model = Model('fc_steer')
+model = Model('donkey_steer')
 CURSOR_UP_ONE = '\x1b[1A'
 ERASE_LINE = '\x1b[2K'
-
 
 def statesAsArray(S):
     res = []
@@ -87,7 +80,6 @@ def statesAsArray(S):
 
     return res
 
-
 def drive(c, sess):
     S,R= c.S.d,c.R.d
     # statesAsArray(S)
@@ -97,7 +89,7 @@ def drive(c, sess):
     
     inputs = sess.run(model.predictions, feed_dict={model.x: states}).flatten()
 
-    # print(inputs)
+    print(inputs)
 
     if step%100 == 0:
         print(CURSOR_UP_ONE + ERASE_LINE + CURSOR_UP_ONE)
@@ -105,6 +97,7 @@ def drive(c, sess):
         track_pos.append(S['trackPos'])
 
     R['steer'] = inputs[0]
+    R['accel'] = inputs[1]
 
     return
 

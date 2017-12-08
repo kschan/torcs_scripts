@@ -117,25 +117,18 @@ class Model:
 
     def build_donkey_steer(self):
         # Input data
-        self.states_idxs = [73]
+        self.states_idxs = [0, 73, 51]
         self.num_states  = len(self.states_idxs)
 
         # Output data
-        self.output_idxs = [3]
+        self.output_idxs = [3, 0]
         self.num_outputs = len(self.output_idxs)
 
         # Create the model
         self.x = tf.placeholder(tf.float32, [None, self.num_states], name="x")
         self.y = tf.placeholder(tf.float32, [None, self.num_outputs], name="y")
 
-        # x_norm = tf.nn.l2_normalize(self.x, dim = 1, epsilon=1e-12, name = 'x_norm')
-        # y_norm = tf.nn.l2_normalize(self.y, dim = 1, epsilon=1e-12, name = 'y_norm')
-
         fc1 = tf.nn.tanh(tf.layers.dense(self.x, 5))
-        # fc1 = tf.layers.batch_normalization(fc1)
-
-        # fc2 = tf.nn.tanh(tf.layers.dense(fc1, 256))
-        # fc2 = tf.layers.batch_normalization(fc2)
 
         self.predictions = tf.nn.tanh(tf.layers.dense(fc1, self.num_outputs, name="predictions"))
 

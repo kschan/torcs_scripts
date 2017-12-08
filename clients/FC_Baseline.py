@@ -53,28 +53,20 @@
 # Try `snakeoil.py --help` to get started.
 
 # for Python3-based torcs python robot client
-import socket
-import sys
-import getopt
-import os
-import time
-PI= 3.14159265359
-
+import socket, sys, getopt, os, time, pickle, time
 from Client import Client, ServerState, DriverAction, destringify
+PI = 3.14159265359
 
-def drive(c):
+def save_dict(data_log_dict, count):
+    save_name = "pid_" + str(count).zfill(7) + ".pickle"
+    pickle_out = open(save_name, "wb")
+    pickle.dump(data_log_dict, pickle_out)
+    pickle_out.close()
 
-    S,R= c.S.d,c.R.d
-    target_speed=100
+def drive(c, count):
+    S, R = c.S.d, c.R.d
 
-    # keys = ['accel', 'brake', 'gear', 'steer', 'clutch', 'focus', 'meta']
-    # for key in keys:
-    #     r = R[key]
-    #     if isinstance(r, list):
-    #         print(key, len(R[key]))
-    #     else:
-    #         print(key, 1)
-
+    target_speed = 100
 
     # Steer To Corner
     R['steer']= S['angle']*10 / PI
@@ -83,11 +75,12 @@ def drive(c):
 
     # Throttle Control
     if S['speedX'] < target_speed - (R['steer']*50):
-        R['accel']+= .01
+        R['accel'] += .01
     else:
-        R['accel']-= .01
+        R['accel'] -= .01
+
     if S['speedX']<10:
-       R['accel']+= 1/(S['speedX']+.1)
+       R['accel'] += 1/(S['speedX']+.1)
 
     # Automatic Transmission
     R['gear']=S['gear']
@@ -97,34 +90,53 @@ def drive(c):
 
     if (S['speedX']>70 and S['gear'] <= 1):
         R['gear']=2
+
     if (S['speedX']>120 and S['gear'] <= 2):
         R['gear']=3
+
     if (S['speedX']>160 and S['gear'] <= 3):
         R['gear']=4
+
     if (S['speedX']>200 and S['gear'] <= 4):
         R['gear']=5
+
     if (S['speedX']>240 and S['gear'] <= 5):
         R['gear']=6
 
-
     if (S['speedX']<65 and S['gear'] >= 2):
         R['gear']=1
+
     if (S['speedX']<115 and S['gear'] >= 3):
         R['gear']=2
+
     if (S['speedX']<155 and S['gear'] >= 4):
         R['gear']=3
+
     if (S['speedX']<195 and S['gear'] >= 5):
         R['gear']=4
+
     if (S['speedX']<235 and S['gear'] >= 6):
         R['gear']=5
 
+    # Data_log
+    if count %3  == 0:
+        data_log_dict = {}
+        data_log_dict['angle']    = S['angle']
+        data_log_dict['trackPos'] = S['trackPos']
+        data_log_dict['speedX']   = S['speedX']
+        data_log_dict['steer']    = R['steer']
+        data_log_dict['accel']    = R['accel']
+
+        save_dict(data_log_dict, count)
+
     return
 
-# ================ MAIN ================
 if __name__ == "__main__":
-    C= Client(p=3001)
-    for step in range(C.maxSteps,0,-1):
+    C = Client(p=3001)
+    count = 0
+    for step in range(C.maxSteps, 0, -1):
         C.get_servers_input()
-        drive(C)
+        drive(C, count)
+        count += 1
         C.respond_to_server()
     C.shutdown()
