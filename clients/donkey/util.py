@@ -89,6 +89,27 @@ def load_data_pid(model, INPUT, OUTPUT, PID_PATH):
            None, None, \
            None, None
 
+
+def load_human_data_pid_labels(INPUT):
+    logged_states, logged_inputs = concatenate_training_data()
+    num_samples    = logged_states.shape[0]
+    pid_inputs = get_pid_inputs(logged_states)
+    random_indices = np.random.permutation(num_samples)
+    train_indices  = random_indices[:(num_samples - 20000)]
+    train_dataset  = logged_states[train_indices, :]
+    train_dataset = train_dataset[:, [0, 73]]
+    train_labels = pid_inputs[train_indices, :]
+    train_labels = train_labels[:, [0]]
+
+    for input_idx in range(len(INPUT)):
+        max_val = np.max(train_dataset[:, input_idx])
+        min_val = np.min(train_dataset[:, input_idx])
+        print('[ INFO ] For', INPUT[input_idx],'-> max_val is:', max_val, 'and min_val is:', min_val)
+        train_dataset[:, input_idx] = 2.0*(train_dataset[:, input_idx] - min_val)/(float(max_val - min_val)) - 1
+
+    return train_dataset, train_labels, None, None, None, None
+
+
 def normalize(data, option):
     if option == 'angle':
         max_val = 0.588705 
@@ -103,3 +124,29 @@ def normalize(data, option):
     return 2.0*(data - min_val)/(float(max_val - min_val)) - 1
 
 
+def get_pid_inputs(logged_states):
+    target_speed = 100
+    pid_inputs = np.zeros((logged_states.shape[0], 2)) # get pid input for steer and control
+    # go through each logged state
+    for i in range(logged_states.shape[0]):
+        angle, trackPos, speedX = logged_states[i, 0], logged_states[i, 73], logged_states[i, 51]
+
+        # Steer To Corner
+        steer= angle*10 / np.pi
+        # Steer To Center
+        steer-= trackPos*.10
+
+        accel = 0
+        # Throttle Control
+        if speedX < target_speed - (steer*50):
+            accel += .01
+        else:
+            accel -= .01
+
+        if speedX<10:
+            accel += 1/(speedX+.1)
+
+        pid_inputs[i,0] = steer
+        pid_inputs[i,1] = accel
+
+    return pid_inputs

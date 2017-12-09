@@ -3,11 +3,11 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from model import Model
-from util import load_data_pid, get_next_batch, normalize
+from util import *
 from Client import Client, ServerState, DriverAction, destringify
 
 MODEL_OPTION   = 'fc'
-INPUT          = ['angle', 'trackPos', 'speedX']
+INPUT          = ['angle', 'trackPos']
 OUTPUT         = ['steer']
 PID_PATH       = "pid_log/v2/*pickle"
 BATCH_SIZE     = 16
@@ -20,7 +20,7 @@ def train():
     # Load dataset
     train_dataset, train_labels, \
     valid_dataset, valid_labels, \
-    test_dataset , test_labels = load_data_pid(model, INPUT, OUTPUT, PID_PATH)
+    test_dataset , test_labels = load_human_data_pid_labels(INPUT)
 
     # Train begins
     train_losses, val_losses = [], []

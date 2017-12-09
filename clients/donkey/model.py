@@ -15,13 +15,14 @@ class Model:
         self.y = tf.placeholder(tf.float32, [None, len(OUTPUT)], name="y")
 
         # Network architecture
-        fc1 = tf.nn.relu(tf.layers.dense(self.x, 32))
-        fc2 = tf.nn.relu(tf.layers.dense(fc1, 32))
-        self.predictions = tf.layers.dense(fc2, len(OUTPUT), name="predictions")
+        fc1 = tf.nn.tanh(tf.layers.dense(self.x, 5))
+
+        self.predictions = tf.nn.tanh(tf.layers.dense(fc1, len(OUTPUT), name="predictions"))
 
         # Define loss and optimizer
         with tf.name_scope('loss'):
             self.total_loss = tf.losses.mean_squared_error(labels=self.y, predictions=self.predictions)
 
         with tf.name_scope('adam_optimizer'):
-            self.train_step = tf.train.AdamOptimizer(1e-8).minimize(self.total_loss)
+            self.train_step = tf.train.AdamOptimizer(1e-5).minimize(self.total_loss)
+
