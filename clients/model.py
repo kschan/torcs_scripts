@@ -46,10 +46,10 @@ class Model:
             raise RuntimeError("[ ERROR ] Wrong model_name entered")
 
     def build_fc_steer(self):
-        self.states_idxs = [73]
+        self.states_idxs = [0,73]
         self.num_states  = len(self.states_idxs)
 
-        self.input_idxs = [3]
+        self.input_idxs = [3,0]
         self.num_inputs = len(self.input_idxs)
 
         # Create the model
@@ -59,20 +59,27 @@ class Model:
         # x_norm = tf.nn.l2_normalize(self.x, dim = 1, epsilon=1e-12, name = 'x_norm')
         # y_norm = tf.nn.l2_normalize(self.y, dim = 1, epsilon=1e-12, name = 'y_norm')
 
-        fc1 = tf.nn.tanh(tf.layers.dense(self.x, 5))
+        fc1 = tf.nn.tanh(tf.layers.dense(self.x , 5, kernel_initializer=tf.initializers.truncated_normal()))
+
+        steer_fc = tf.nn.tanh(tf.layers.dense(fc1 , 5, kernel_initializer=tf.initializers.truncated_normal()))
+        accel_fc = tf.nn.tanh(tf.layers.dense(fc1 , 5, kernel_initializer=tf.initializers.truncated_normal()))
+        
         # fc1 = tf.layers.batch_normalization(fc1)
 
         # fc2 = tf.nn.tanh(tf.layers.dense(fc1, 256))
         # fc2 = tf.layers.batch_normalization(fc2)
 
-        self.predictions = tf.nn.tanh(tf.layers.dense(fc1, self.num_inputs, name="predictions"))
+        self.predictions_steer  = tf.layers.dense(steer_fc, 1, name="predictions_steer", kernel_initializer=tf.initializers.truncated_normal())
+        self.predictions_accel = tf.nn.relu(tf.layers.dense(accel_fc, 1, name="predictions_accel", kernel_initializer=tf.initializers.truncated_normal()))
 
         # Define loss and optimizer
+        self.predictions = tf.concat([self.predictions_steer, self.predictions_accel], axis=1)
+
         with tf.name_scope('loss'):
             self.total_loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.predictions)
 
         with tf.name_scope('adam_optimizer'):
-            self.train_step = tf.train.AdamOptimizer(1e-5).minimize(self.total_loss)
+            self.train_step = tf.train.AdamOptimizer(1e-6).minimize(self.total_loss)
 
     def build_cnn_steer(self):
         self.input_idxs = [3]   # only steering
@@ -122,6 +129,7 @@ class Model:
 
         # Output data
         self.output_idxs = [3, 0]
+        self.output_idxs = [0]
         self.num_outputs = len(self.output_idxs)
 
         # Create the model
