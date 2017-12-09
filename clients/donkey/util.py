@@ -88,3 +88,18 @@ def load_data_pid(model, INPUT, OUTPUT, PID_PATH):
     return train_dataset, train_label, \
            None, None, \
            None, None
+
+def normalize(data, option):
+    if option == 'angle':
+        max_val = 0.588705 
+        min_val = -0.352569
+    elif option == 'trackPos':
+        max_val = 3.05135
+        min_val = -0.442205
+    elif option == 'speedX':
+        max_val = 122.841
+        min_val = 0.000256649
+
+    return 2.0*(data - min_val)/(float(max_val - min_val)) - 1
+
+
