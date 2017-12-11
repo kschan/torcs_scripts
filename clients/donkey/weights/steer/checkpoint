@@ -1,0 +1,2 @@
+model_checkpoint_path: "steer.ckpt"
+all_model_checkpoint_paths: "steer.ckpt"

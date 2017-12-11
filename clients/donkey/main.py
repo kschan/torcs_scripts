@@ -6,66 +6,95 @@ from model import Model
 from util import *
 from Client import Client, ServerState, DriverAction, destringify
 
-MODEL_OPTION   = 'fc'
-INPUT          = ['angle', 'trackPos']
-OUTPUT         = ['steer']
-PID_PATH       = "pid_log/v2/*pickle"
-BATCH_SIZE     = 16
-TRAIN_MAX_ITER = 10000
+INPUT          = ['angle', 'trackPos', 'speedX']
+OUTPUT         = ['steer', 'accel']
+PID_PATH       = "pid_label/*pickle"
+BATCH_SIZE     = 32
+TRAIN_MAX_ITER = 30000
 
 def train():
-    # Build model
-    model = Model(MODEL_OPTION, INPUT, OUTPUT)
+    model = Model('steer_accel')
 
     # Load dataset
+    # # train_dataset, train_labels, \
+    # # valid_dataset, valid_labels, \
+    # # test_dataset , test_labels = load_human_data_pid_labels(INPUT, OUTPUT)
+
     train_dataset, train_labels, \
     valid_dataset, valid_labels, \
-    test_dataset , test_labels = load_human_data_pid_labels(INPUT)
+    test_dataset , test_labels = load_data_pid(INPUT, OUTPUT, PID_PATH)
+    print('[ INFO ] Train dataset size:', train_dataset.shape)
 
     # Train begins
-    train_losses, val_losses = [], []
+    losses = []; train_count = 0
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for step in range(TRAIN_MAX_ITER):
-            batch = get_next_batch(train_dataset, train_labels, BATCH_SIZE)
-            train_loss = sess.run([model.total_loss], feed_dict={model.x: batch[0], model.y: batch[1]})[0]
-            train_losses.append(train_loss)
+
+        for train_iter in range(TRAIN_MAX_ITER):
+            print('train_iter:', train_iter)
+            if train_count*BATCH_SIZE >= train_dataset.shape[0]:
+                train_count = 0
+
+            # Get batch data
+            batch = get_next_batch(train_dataset, train_labels, train_count, BATCH_SIZE)
+            train_steer = np.concatenate([batch[0][:, 0].reshape((-1, 1)),
+                                          batch[0][:, 1].reshape((-1, 1))], axis = 1) # angle, trackPos
+            label_steer = batch[1][:, 0].reshape((-1, 1)) # steer
+
+            train_accel = np.concatenate([batch[0][:, 0].reshape((-1, 1)),
+                                          batch[0][:, 1].reshape((-1, 1)),
+                                          batch[0][:, 2].reshape((-1, 1))], axis = 1) # angle, trackPos, speedX
+            label_accel = batch[1][:, 1].reshape((-1, 1)) # accel
+
+            _, loss = sess.run([model.opt, model.total_loss], 
+                               feed_dict={model.x_steer: train_steer, model.y_steer: label_steer,
+                                          model.x_accel: train_accel, model.y_accel: label_accel})
+            losses.append(loss)
+
+            train_count += 1
+
         saver = tf.train.Saver()
-        saver.save(sess, './weights/fc_baseline.ckpt')
+        saver.save(sess, './weights/steer_accel.ckpt')
 
     # Show loss in graph
     ax = plt.gca()
-    ax.plot(range(len(train_losses)), train_losses, label="training loss")
-    # ax.plot(range(len(train_losses)), val_losses, label="validation loss")
+    ax.plot(losses, label="loss")
     ax.set_xlabel("training steps")
     ax.set_ylabel("loss")
-
+    ax.legend()
     plt.show()
 
 def drive(c, sess, model):
     S, R = c.S.d, c.R.d
 
-    # Normalize data
-    input_data = np.zeros((1,len(INPUT)), dtype=np.float64)
-    for input_idx, input_val in enumerate(INPUT):
-        input_data[0, input_idx] = normalize(S[input_val], input_val)
+    # steer model
+    data_steer = np.zeros((1, 2), dtype=np.float64)
+    data_steer[0, 0] = normalize(S['angle'], 'angle')
+    data_steer[0, 1] = normalize(S['trackPos'], 'trackPos')
 
-    outputs = sess.run(model.predictions, feed_dict={model.x: input_data}).flatten()
+    data_accel = np.zeros((1, 3), dtype=np.float64)
+    data_accel[0, 0] = normalize(S['angle'], 'angle')
+    data_accel[0, 1] = normalize(S['trackPos'], 'trackPos')
+    data_accel[0, 2] = normalize(S['speedX'], 'speedX')
 
-    for output_idx, output_val in enumerate(OUTPUT):
-        R[output_val] = outputs[output_idx]
+    pred_steer, pred_accel = sess.run([model.pred_steer, model.pred_accel], 
+                                      feed_dict={model.x_steer: data_steer, model.x_accel: data_accel, })
+    print(pred_steer, pred_accel)
+
+    R['steer'] = pred_steer[0]
+    R['accel'] = pred_accel[0]
 
     return
 
 def test():
     # Build model
-    model = Model(MODEL_OPTION, INPUT, OUTPUT)
-
+    model = Model('steer_accel')
     with tf.Session() as sess:
         saver = tf.train.Saver()
-        saver.restore(sess, "./weights/fc_baseline.ckpt")
+        saver.restore(sess, "./weights/steer_accel.ckpt")
+
         C = Client(p=3001)
-        for step in range(C.maxSteps,0,-1):
+        for step in range(C.maxSteps, 0, -1):
             C.get_servers_input()
             drive(C, sess, model)
             C.respond_to_server()
