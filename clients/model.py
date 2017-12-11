@@ -18,7 +18,7 @@ rpm             50
 speedX          51
 speedY          52
 speedZ          53
-track           54 - 72
+track           54 - 72, middle is 63
 trackPos        73
 wheelSpinVel    74
 z               78
@@ -37,17 +37,58 @@ class Model:
             print('[ INFO ] Building fc_steer ...')
             self.build_fc_steer()
         elif model_name == 'cnn_steer':
-            print('[ INFO ] Building fc_steer ...')
+            print('[ INFO ] Building cnn_steer ...')
             self.build_cnn_steer()
         elif model_name == 'donkey_steer':
             print('[ INFO ] Building donkey_steer ...')
             self.build_donkey_steer()
+        elif model_name == 'steer_accel':
+            print('[ INFO ] Building steer_accel ...')
+            self.build_steer_accel()
         else:
             raise RuntimeError("[ ERROR ] Wrong model_name entered")
+
+    def build_steer_accel(self):     
+        self.input_idxs = [3, 0]       # only steering
+        self.states_idxs = [0, 73, 63, 51]
+
+        self.num_states  = len(self.states_idxs)
+        self.num_inputs = len(self.input_idxs)
+
+        # Create the model
+        self.x = tf.placeholder(tf.float32, [None, self.num_states], name="x")
+        self.y = tf.placeholder(tf.float32, [None, self.num_inputs], name="y")
+
+        x_steer = self.x[:, :3]/[1., 1., 200]
+        speedX = self.x[:, 3]/100.
+        speedX = tf.reshape(speedX, [-1, 1])
+
+        steer_fc1 = tf.nn.tanh(tf.layers.dense(x_steer , 5, kernel_initializer=tf.initializers.truncated_normal()))
+        steer_fc2 = tf.nn.tanh(tf.layers.dense(steer_fc1 , 10, kernel_initializer=tf.initializers.truncated_normal()))
+        self.predictions_steer = tf.nn.tanh(tf.layers.dense(steer_fc2 , 1, kernel_initializer=tf.initializers.truncated_normal()))
+
+        x_accel = tf.concat([self.predictions_steer, speedX], axis = 1)
+        accel_fc1 = tf.nn.relu(tf.layers.dense(x_accel , 5, kernel_initializer=tf.initializers.truncated_normal()))
+        self.predictions_accel = tf.nn.relu(tf.layers.dense(accel_fc1 , 1, kernel_initializer=tf.initializers.truncated_normal()))
+        
+
+        # Define loss and optimizer
+
+        with tf.name_scope('loss'):
+            self.steer_loss = tf.losses.mean_squared_error(labels=self.y[:, 1], predictions = tf.reshape(self.predictions_steer, [-1]))
+            self.accel_loss = tf.losses.mean_squared_error(labels=self.y[:, 0], predictions = tf.reshape(self.predictions_accel, [-1]))
+            self.total_loss = 0.5*self.steer_loss + 2*self.accel_loss
+
+        with tf.name_scope('adam_optimizer'):
+            self.train_step = tf.train.AdamOptimizer(1e-6).minimize(self.total_loss)
+
 
     def build_fc_steer(self):
         self.states_idxs = [0,73]
         self.num_states  = len(self.states_idxs)
+
+        self.input_idxs = [3]       # only steering
+        self.states_idxs = [54, 63, 72, 73]
 
         self.input_idxs = [3,0]
         self.num_inputs = len(self.input_idxs)
@@ -83,7 +124,7 @@ class Model:
 
     def build_cnn_steer(self):
         self.input_idxs = [3]   # only steering
-        self.states_idxs = list(np.arange(54, 73)) + [73] + [0]
+        self.states_idxs = list(np.arange(54, 73)) # + [73] + [0]
 
         self.num_inputs = len(self.input_idxs)
         self.num_states = len(self.states_idxs)
@@ -91,36 +132,38 @@ class Model:
         self.x = tf.placeholder(tf.float32, [None, self.num_states], name="x")
         self.y = tf.placeholder(tf.float32, [None, self.num_inputs], name="y")
 
-        x_norm = (self.x[:,:19]/50.0)   # normalizing track distance readings
+        x_norm = (self.x[:,:19]/200.0)   # normalizing track distance readings
         x_norm = tf.reshape(x_norm, [-1, 1, 19, 1])
 
-        conv1 = tf.layers.conv2d(x_norm, filters = 10, kernel_size = [1, 5], strides = [1, 2])
-        conv1 = tf.nn.relu(conv1)
+        conv1 = tf.layers.conv2d(x_norm, filters = 20, kernel_size = [1, 5], strides = [1, 2])
+        conv1 = tf.nn.tanh(conv1)
 
-        conv2 = tf.layers.conv2d(conv1, filters = 20, kernel_size = [1, 3], strides=[1, 2])
-        conv2 = tf.nn.relu(conv2)
+        conv2 = tf.layers.conv2d(conv1, filters = 50, kernel_size = [1, 3], strides=[1, 1])
+        conv2 = tf.nn.tanh(conv2)
 
-        conv3 = tf.layers.conv2d(conv2, filters = 40, kernel_size = [1, 3], strides= [1, 1])
-        conv3 = tf.nn.relu(conv3)
+        flattened = tf.contrib.layers.flatten(conv2)
 
-        flattened = tf.contrib.layers.flatten(conv3)
-        fc1_conv = tf.nn.tanh(tf.layers.dense(flattened, 15))
+        fc1_conv = tf.nn.tanh(tf.layers.dense(flattened, 50))
 
         # fc2_conv = tf.nn.tanh(tf.layers.dense(fc1_conv, 5))
 
-        track_pos = tf.reshape(self.x[:,19], [-1, 1])
-        angle = tf.reshape(self.x[:, 20], [-1, 1])
+        # track_pos = tf.reshape(self.x[:,19], [-1, 1])
+        # angle = tf.reshape(self.x[:, 20], [-1, 1])
 
-        concat = tf.concat([fc1_conv, track_pos, angle/3.1415], axis=1)
-        fc1 = tf.nn.tanh(tf.layers.dense(fc1_conv, 10))
+        # scan_indices = [0, 5, 9, 13, 18]
+        # scans = tf.gather(self.x, scan_indices, axis=1)
+        # scans = tf.reshape(scans, [-1, len(scan_indices)])/200.0
 
-        self.predictions = tf.nn.tanh(tf.layers.dense(fc1, self.num_inputs))
+        # concat = tf.concat([fc1_conv], axis=1)
+        fc1 = tf.nn.tanh(tf.layers.dense(fc1_conv, 20))
+        self.predictions_steer = tf.layers.dense(fc1, self.num_inputs)
+        self.predictions_accel = tf.constant(0.3)
 
         with tf.name_scope('loss'):
-            self.total_loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.predictions)
+            self.total_loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.predictions_steer)
 
         with tf.name_scope('adam_optimizer'):
-            self.train_step = tf.train.AdamOptimizer(1e-5).minimize(self.total_loss)
+            self.train_step = tf.train.AdamOptimizer(1E-4).minimize(self.total_loss)
 
     def build_donkey_steer(self):
         # Input data
@@ -146,3 +189,13 @@ class Model:
 
         with tf.name_scope('adam_optimizer'):
             self.train_step = tf.train.AdamOptimizer(1e-5).minimize(self.total_loss)
+
+    def build_gan_steer():
+        self.input_idxs = [3]   # only steering
+        self.states_idxs = list(np.arange(54, 73)) + [73]# + [0]
+
+        self.num_inputs = len(self.input_idxs)
+        self.num_states = len(self.states_idxs)
+
+        self.x = tf.placeholder(tf.float32, [None, self.num_states], name="x")
+        self.y = tf.placeholder(tf.float32, [None, self.num_inputs], name="y")

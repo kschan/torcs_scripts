@@ -12,6 +12,9 @@ PID_PATH       = "pid_label/*pickle"
 BATCH_SIZE     = 32
 TRAIN_MAX_ITER = 30000
 
+CURSOR_UP_ONE = '\x1b[1A'
+ERASE_LINE = '\x1b[2K'
+
 def train():
     model = Model('steer_accel')
 
@@ -41,9 +44,7 @@ def train():
                                           batch[0][:, 1].reshape((-1, 1))], axis = 1) # angle, trackPos
             label_steer = batch[1][:, 0].reshape((-1, 1)) # steer
 
-            train_accel = np.concatenate([batch[0][:, 0].reshape((-1, 1)),
-                                          batch[0][:, 1].reshape((-1, 1)),
-                                          batch[0][:, 2].reshape((-1, 1))], axis = 1) # angle, trackPos, speedX
+            train_accel = np.concatenate([batch[0][:, 2].reshape((-1, 1))], axis = 1) # angle, trackPos, speedX
             label_accel = batch[1][:, 1].reshape((-1, 1)) # accel
 
             _, loss = sess.run([model.opt, model.total_loss], 
@@ -72,10 +73,8 @@ def drive(c, sess, model):
     data_steer[0, 0] = normalize(S['angle'], 'angle')
     data_steer[0, 1] = normalize(S['trackPos'], 'trackPos')
 
-    data_accel = np.zeros((1, 3), dtype=np.float64)
-    data_accel[0, 0] = normalize(S['angle'], 'angle')
-    data_accel[0, 1] = normalize(S['trackPos'], 'trackPos')
-    data_accel[0, 2] = normalize(S['speedX'], 'speedX')
+    data_accel = np.zeros((1, 1), dtype=np.float64)
+    data_accel[0, 0] = normalize(S['speedX'], 'speedX')
 
     pred_steer, pred_accel = sess.run([model.pred_steer, model.pred_accel], 
                                       feed_dict={model.x_steer: data_steer, model.x_accel: data_accel, })
@@ -83,6 +82,11 @@ def drive(c, sess, model):
 
     R['steer'] = pred_steer[0]
     R['accel'] = pred_accel[0]
+
+    if step%100 == 0:
+        print(CURSOR_UP_ONE + ERASE_LINE + CURSOR_UP_ONE)
+        print('distRaced:, ', S['distRaced'], 'trackPos: ', S['trackPos'], '\r',)
+        track_pos.append(S['trackPos'])
 
     return
 

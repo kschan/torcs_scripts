@@ -76,7 +76,7 @@ class Model:
         self.x_steer = tf.placeholder(tf.float32, [None, 2], name="x_steer") # angle, trackPos
         self.y_steer = tf.placeholder(tf.float32, [None, 1], name="y_steer")
 
-        self.x_accel = tf.placeholder(tf.float32, [None, 3], name="x_accel") # angle, trackPos, speedX
+        self.x_accel = tf.placeholder(tf.float32, [None, 1], name="x_accel") # angle, trackPos, speedX
         self.y_accel = tf.placeholder(tf.float32, [None, 1], name="y_accel")
     
         # Network architecture

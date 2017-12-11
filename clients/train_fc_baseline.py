@@ -11,7 +11,7 @@ from model import Model
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from utils import *
+# from utils import *
 
 
 def concatenate_training_data():
@@ -45,9 +45,13 @@ def bias_variable(shape):
 
 def main(_):
 
-    model = Model('fc_steer')
+    model = Model('cnn_steer')
 
     logged_states, logged_inputs = concatenate_training_data()
+    good_indices = (logged_states[:, 73] != 0)
+    logged_states = logged_states[good_indices, :]
+    logged_inputs = logged_inputs[good_indices, :]
+
     num_samples    = logged_states.shape[0]
     random_indices = np.random.permutation(num_samples)
     train_indices  = random_indices[:(num_samples - 20000)]
@@ -56,66 +60,36 @@ def main(_):
 
     train_dataset  = logged_states[train_indices, :]
     train_dataset  = train_dataset[:, model.states_idxs]
+    train_labels   = logged_inputs[train_indices, :]
+    train_labels   = train_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
 
-    # print(logged_states.shape)
-    pid_inputs = get_pid_inputs(logged_states)
-    # print(pid_inputs.shape)
-    train_dataset = logged_states[train_indices, :]
-    train_labels = pid_inputs[train_indices, :]
-    valid_dataset = logged_states[valid_indices,:]
-    valid_labels = pid_inputs[valid_indices, :]
+    valid_dataset  = logged_states[valid_indices, :]
+    valid_dataset  = valid_dataset[:, model.states_idxs]
+    valid_labels   = logged_inputs[valid_indices, :]
+    valid_labels   = valid_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
 
-    train_dataset = train_dataset[:, [0, 73]]
-    valid_dataset = valid_dataset[:, [0, 73]]
-    # train_labels = train_labels[:,[0]]
+    test_dataset   = logged_states[test_indices, :]
+    test_dataset   = test_dataset[:, model.states_idxs]
+    test_labels    = logged_inputs[test_indices, :]
+    test_labels    = test_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
 
-    for input_idx in range(2):
-        max_val = np.max(train_dataset[:, input_idx])
-        min_val = np.min(train_dataset[:, input_idx])
-        print(max_val)
-        print(min_val)
-        train_dataset[:, input_idx] = 2.0*(train_dataset[:, input_idx] - min_val)/(float(max_val - min_val)) - 1
-        valid_dataset[:, input_idx] = 2.0*(valid_dataset[:, input_idx] - min_val)/(float(max_val - min_val)) - 1
+    steer_scale = (1/np.var(logged_inputs[:, 3]))**0.5
+    print(steer_scale)
+    plt.hist(logged_inputs[:, 3]*steer_scale, bins=1000)
+    plt.show()
 
-    print(train_dataset.shape)
-    print(train_labels.shape)
-
-
-
-
-#     train_labels   = logged_inputs[train_indices, :]
-#     train_labels   = train_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
-
-#     valid_dataset  = logged_states[valid_indices, :]
-#     valid_dataset  = valid_dataset[:, model.states_idxs]
-
-#     valid_labels   = logged_inputs[valid_indices, :]
-#     valid_labels   = valid_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
-
-#     test_dataset   = logged_states[test_indices, :]
-#     test_dataset   = test_dataset[:, model.states_idxs]
-
-#     test_labels    = logged_inputs[test_indices, :]
-#     test_labels    = test_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
-
-    batch_size = 32
+    batch_size = 8
 
     losses, val_losses = [], []
 
-#     # plt.hist(logged_states[:, 63], bins = 20)
-#     # plt.show()
-
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for step in range(50000):
+        for step in range(500000):
             batch = get_next_batch(train_dataset, train_labels, batch_size)
-#             # print(batch[1])
             _, loss = sess.run([model.train_step, model.total_loss], feed_dict={model.x: batch[0], model.y: batch[1]})
             if step % 50 == 0:
                 val_loss, = sess.run([model.total_loss], feed_dict={model.x: valid_dataset, model.y: valid_labels})
-                print('step %d, training loss %f, ' % (step, loss))
-                if loss < 0.03:
-                    break
+                print('step %d, training loss %f, val_loss %f' % (step, loss, val_loss))
                 losses.append(loss)
                 val_losses.append(val_loss)
         saver = tf.train.Saver()
