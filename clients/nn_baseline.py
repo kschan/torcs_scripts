@@ -61,7 +61,7 @@ import matplotlib.pyplot as plt
 from model import Model
 from Client import Client, ServerState, DriverAction, destringify
 
-model = Model('donkey_steer')
+model = Model('fc_steer')
 CURSOR_UP_ONE = '\x1b[1A'
 ERASE_LINE = '\x1b[2K'
 
@@ -84,9 +84,20 @@ def drive(c, sess):
     S,R= c.S.d,c.R.d
     # statesAsArray(S)
 
+
+    angle_max = 2.11806
+    angle_min = -2.89583
+    trackPos_max = 2.10563
+    trackPos_min = -1.97679
+
     states = np.asarray(statesAsArray(S)).reshape([1, -1])
-    states = states[:, model.states_idxs]
-    
+    # states = states[:, [model.states_idxs]]
+    states = states[:, [0, 73]]
+    print(states.shape)
+    states[0,0] = 2.0*(states[0,0] - angle_min)/(angle_max-angle_min) - 1
+    states[0,1] = 2.0*(states[0,1] - trackPos_min)/(trackPos_max - trackPos_min) - 1
+
+
     inputs = sess.run(model.predictions, feed_dict={model.x: states}).flatten()
 
     print(inputs)
