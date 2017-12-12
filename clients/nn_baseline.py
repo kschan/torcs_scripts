@@ -61,7 +61,7 @@ import matplotlib.pyplot as plt
 from model import Model
 from Client import Client, ServerState, DriverAction, destringify
 
-model = Model('cnn_steer')
+model = Model('steer_accel')
 CURSOR_UP_ONE = '\x1b[1A'
 ERASE_LINE = '\x1b[2K'
 
@@ -99,6 +99,7 @@ def drive(c, sess):
 
     R['steer'] = steering
     R['accel'] = accel
+    print(steering)
 
     return
 

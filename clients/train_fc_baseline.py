@@ -26,6 +26,18 @@ def concatenate_training_data():
 
     return logged_states, logged_inputs
 
+def concatenate_training_data_pid():
+    logged_input_files = glob.glob("../logs/*/logged_inputs*")
+    print(logged_input_files)
+    logged_inputs = np.concatenate([np.load(file) for file in logged_input_files], axis = 0)
+    print("pid_logged_inputs: ", logged_inputs.shape)
+
+    logged_state_files = glob.glob("../logs/*/logged_states*")
+    logged_states = np.concatenate([np.load(file) for file in logged_state_files], axis = 0)
+    print("pid_logged_states: ", logged_states.shape)
+
+    return logged_states, logged_inputs
+
 def get_next_batch(train_dataset, train_labels, batch_size):
     batch_indices = np.random.randint(train_labels.shape[0], size = batch_size)
     batch_dataset = train_dataset[batch_indices, :]
@@ -42,12 +54,19 @@ def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
 
-
 def main(_):
 
-    model = Model('cnn_steer')
-
+    model = Model('steer_accel')
     logged_states, logged_inputs = concatenate_training_data()
+    pid_logged_states, pid_logged_inputs = concatenate_training_data_pid()
+
+    steer_scale = (1/np.var(logged_inputs[:, 3]))**0.5
+    pid_logged_inputs[:, 3] = pid_logged_inputs[:, 3] * steer_scale
+    logged_inputs[:, 3] = logged_inputs[:, 3] * steer_scale
+
+    pid_logged_states = pid_logged_states[:, model.states_idxs]
+    pid_logged_inputs = pid_logged_inputs[:, model.input_idxs]
+    
     good_indices = (logged_states[:, 73] != 0)
     logged_states = logged_states[good_indices, :]
     logged_inputs = logged_inputs[good_indices, :]
@@ -73,10 +92,9 @@ def main(_):
     test_labels    = logged_inputs[test_indices, :]
     test_labels    = test_labels[:, model.input_idxs].reshape((-1, model.num_inputs))
 
-    steer_scale = (1/np.var(logged_inputs[:, 3]))**0.5
-    print(steer_scale)
-    plt.hist(logged_inputs[:, 3]*steer_scale, bins=1000)
-    plt.show()
+    # print(steer_scale)
+    # plt.hist(logged_inputs[:, 3], bins=1000)
+    # plt.show()
 
     batch_size = 8
 
@@ -84,7 +102,16 @@ def main(_):
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for step in range(500000):
+        # for step in range(10000):
+        #     batch = get_next_batch(pid_logged_states, pid_logged_inputs, batch_size)
+        #     _, loss = sess.run([model.train_step, model.total_loss], feed_dict={model.x: batch[0], model.y: batch[1]})
+        #     if step % 50 == 0:
+        #         val_loss, = sess.run([model.total_loss], feed_dict={model.x: valid_dataset, model.y: valid_labels})
+        #         print('step %d, training loss %f, val_loss %f' % (step, loss, val_loss))
+        #         losses.append(loss)
+        #         val_losses.append(val_loss)
+
+        for step in range(20000):
             batch = get_next_batch(train_dataset, train_labels, batch_size)
             _, loss = sess.run([model.train_step, model.total_loss], feed_dict={model.x: batch[0], model.y: batch[1]})
             if step % 50 == 0:
